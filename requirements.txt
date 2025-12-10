@@ -1,0 +1,12 @@
+faiss-cpu==1.12.0
+fastapi==0.121.1
+pillow==12.0.0
+pydantic==2.12.4
+python-multipart==0.0.20
+requests==2.32.5
+SQLAlchemy==2.0.44
+streamlit==1.51.0
+torch==2.9.0
+torchvision==0.24.0
+transformers==4.57.3
+uvicorn==0.38.0

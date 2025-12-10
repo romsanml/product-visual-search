@@ -1,0 +1,7 @@
+vs-venv/
+__pycache__/
+req.txt
+data/
+database/
+notebooks/
+ui/pages/images2search
