@@ -106,25 +106,35 @@ with tab2:
     # Загрузка своего изображения
     photo = st.file_uploader("Загрузите фото", type=["jpg", "jpeg", "png", "webp"])
 
+    # Проверяем, изменилось ли фото
+    if 'current_photo_name' not in st.session_state:
+        st.session_state.current_photo_name = None
+        st.session_state.cropped_images = {}  # Инициализируем один раз
+
     if photo is not None:
+        # Если выбрано новое фото — сбрасываем кэш вырезанных фрагментов
+        if st.session_state.current_photo_name != photo.name:
+            st.session_state.cropped_images = {}  # Очищаем кэш
+            st.session_state.current_photo_name = photo.name
+
         st.image(photo, caption=photo.name, width='content')
         st.divider()
+
         data_photo = photo.getvalue()
         photo_tuple = (photo.name, data_photo, photo.type or "application/octet-stream")
         res = post_photo("/search/by-photo/", photo_tuple)
         results_boxes = res.get("results", [])
+
+        # Открываем изображение
         image = Image.open(BytesIO(data_photo)).convert("RGB")
-        # st.write(results_boxes)
+
+        # Параметры
         cols_5 = 5
         max_display=5
         padding_percent=0.2
 
-        # Инициализация кэша в session_state
-        if 'cropped_images' not in st.session_state:
-            st.session_state.cropped_images = {}
-
-        # Уникальный ключ для кэширования (можно улучшить, если нужно)
-        cache_key = hash(image.tobytes()) if hasattr(image, 'tobytes') else id(image)
+        # Уникальный ключ для изображения
+        cache_key = hash(data_photo)  # Лучше использовать hash байтов — гарантирует уникальность
 
         if cache_key not in st.session_state.cropped_images:
             cropped_list = []
