@@ -193,7 +193,7 @@ with tab2:
 
         # Выбор одного из примеров
         cache_key = next(iter(st.session_state.cropped_images))
-        cropped_list = st.session_state.cropped_images[cache_key]
+        cropped_list = st.session_state.cropped_images[cache_key][:max_display]
 
         if cropped_list:
             # Создаём список опций: "метка (score)"

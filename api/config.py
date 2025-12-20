@@ -24,7 +24,14 @@ class Settings(BaseModel):
         "cable",
         "dress",
         "glasses",
-        "fitness bracelet"
+        "fitness bracelet",
+        "keyboard",
+        "mouse",
+        "headphones",
+        "watch",
+        "shoes",
+        "bag",
+        "batteries"
     ]
 
 settings = Settings()
