@@ -71,8 +71,8 @@ def build_prompt(phrases: List[str]) -> str:
 def search_by_photo(
     photo: UploadFile = File(...),
     searcher=Depends(get_searcher),
+    DEFAULT_PROMPT_PHRASES: List[str] = settings.DEFAULT_PROMPT_PHRASES,
 ):
-    DEFAULT_PROMPT_PHRASES = ["product", "item", "package", "bottle", "can", "box", "bag", "jar"]
     data = photo.file.read()
     prompt = build_prompt(DEFAULT_PROMPT_PHRASES)
     results = searcher.detect(data=data, prompt=prompt) # список {box, score, label}

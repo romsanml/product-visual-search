@@ -2,6 +2,8 @@ import streamlit as st
 import mimetypes
 import random
 from pathlib import Path
+from io import BytesIO
+from PIL import Image
 from ui.api_client import post_file, post_photo
 
 st.set_page_config(layout="wide")
@@ -76,7 +78,7 @@ with tab1:
             st.warning("Выберите пример или загрузите изображение для поиска.")
 
         if file_tuple:
-            # Передаём top_k в query
+            # Передаём top_k в запрос
             res = post_file(f"/search/by-image?top_k={top_k}", file_tuple)
             results = res.get("results", [])
             errors = res.get("error", [])
@@ -101,66 +103,140 @@ with tab1:
                     st.write(f"description: {r['description']}")
 
 with tab2:
-    # Инициализация session state для хранения примеров
-    # if 'example_paths' not in st.session_state:
-    #     base_dir = Path("./ui/pages")
-    #     ex_dir = base_dir / "images2search"
-    #     example_paths = []
-    #     if ex_dir.exists():
-    #         all_images = [p for p in ex_dir.glob("*") if p.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp"]]
-    #         random.shuffle(all_images)
-    #         if len(all_images) >= 5:
-    #             example_paths.extend(all_images[:5])
-    #         else:
-    #             example_paths.extend(all_images)
-    #     st.session_state.example_paths = example_paths
-
-    # # Используем сохранённые пути
-    # example_paths = st.session_state.example_paths
-
     # Загрузка своего изображения
     photo = st.file_uploader("Загрузите фото", type=["jpg", "jpeg", "png", "webp"])
 
     if photo is not None:
-        st.write("Обработка изображения")
+        st.image(photo, caption=photo.name, width='content')
+        st.divider()
         data_photo = photo.getvalue()
         photo_tuple = (photo.name, data_photo, photo.type or "application/octet-stream")
         res = post_photo("/search/by-photo/", photo_tuple)
         results_boxes = res.get("results", [])
-        st.write(results_boxes)
+        image = Image.open(BytesIO(data_photo)).convert("RGB")
+        # st.write(results_boxes)
+        cols_5 = 5
+        max_display=5
+        padding_percent=0.2
 
-    # top_n = st.slider("Top-N", 1, 50, 10)
+        # Инициализация кэша в session_state
+        if 'cropped_images' not in st.session_state:
+            st.session_state.cropped_images = {}
 
-    # if st.button("Искать предмет"):
-    #     file_tuple = None
+        # Уникальный ключ для кэширования (можно улучшить, если нужно)
+        cache_key = hash(image.tobytes()) if hasattr(image, 'tobytes') else id(image)
 
-    #     if img is not None:
-    #         data = img.getvalue()
-    #         file_tuple = (img.name, data, img.type or "application/octet-stream")
-    #     else:
-    #         st.warning("Загрузите фото для поиска.")
+        if cache_key not in st.session_state.cropped_images:
+            cropped_list = []
+            img_w, img_h = image.size
+            for item in results_boxes:
+                try:
+                    box = item["box"]
+                    label = item["label"]
+                    score = item["score"]
+                    
+                    # Проверяем формат box: [x1, y1, x2, y2]
+                    if len(box) != 4:
+                        continue
+                    x1, y1, x2, y2 = map(int, box)
+                    
+                    # Размеры текущего бокса
+                    width = x2 - x1
+                    height = y2 - y1
+                    
+                    # Вычисляем отступы (10% от ширины/высоты бокса)
+                    pad_x = int(width * padding_percent)
+                    pad_y = int(height * padding_percent)
+                    
+                    # Новые координаты с отступами
+                    new_x1 = max(0, x1 - pad_x)
+                    new_y1 = max(0, y1 - pad_y)
+                    new_x2 = min(img_w, x2 + pad_x)
+                    new_y2 = min(img_h, y2 + pad_y)
+                    
+                    # Обрезаем изображение с учётом отступов
+                    cropped = image.crop((new_x1, new_y1, new_x2, new_y2))
+                    cropped_list.append({
+                        "image": cropped,
+                        "label": label,
+                        "score": score
+                    })
+                except (KeyError, ValueError, IndexError) as e:
+                    st.warning(f"Пропущен бокс из-за ошибки: {e}")
+                    continue
+            
+            st.session_state.cropped_images[cache_key] = cropped_list
 
-    #     if file_tuple:
-    #         # Передаём top_k в query
-    #         res = post_file(f"/search/by-image?top_k={top_n}", file_tuple)
-    #         results = res.get("results", [])
-    #         if not results:
-    #             st.info("Ничего не найдено.")
-    #         for r in results:
-    #             cols = st.columns([1, 1, 4])
-    #             with cols[0]:
-    #                 st.image(f".{r['url']}", width='stretch')
-    #             with cols[1]:
-    #                 st.write(f"product_id: {r['product_id']}")
-    #                 st.write(f"image_id: {r['image_id']}")
-    #                 st.write(f"score: {r['score']:.4f}")
-    #                 st.write(f"title: {r['title']}")
-    #                 st.write(f"rating: {r['rating']:.1f}")
-    #             with cols[2]:
-    #                 st.write(f"description: {r['description']}")
+        # Берём не более max_display первых
+        displayed_items = st.session_state.cropped_images[cache_key][:max_display]
 
+        # Отображаем по 5 в строке
+        for i in range(0, len(displayed_items), cols_5):
+            cols_container = st.columns(cols_5)
+            for j in range(cols_5):
+                idx = i + j
+                if idx >= len(displayed_items):
+                    break
+                with cols_container[j]:
+                    item = displayed_items[idx]
+                    st.image(item["image"], caption=f"{item['label']}: {item['score']:.2f}", width='stretch')
 
-# with tab2:
+        # Выбор одного из примеров
+        cache_key = next(iter(st.session_state.cropped_images))
+        cropped_list = st.session_state.cropped_images[cache_key]
+
+        if cropped_list:
+            # Создаём список опций: "метка (score)"
+            label_options = [f"{item['label']}: {item['score']:.2f}" for item in cropped_list]
+            label_options = ["— Не выбран —"] + label_options
+
+            # Выпадающий список для выбора фрагмента по метке
+            selected_label = st.selectbox("Выберите вырезанный фрагмент по метке", label_options, index=0)
+
+            if selected_label != "— Не выбран —":
+                # Находим индекс выбранного элемента
+                idx = label_options.index(selected_label) - 1
+                chosen_item = cropped_list[idx]
+                st.info(f"Выбран фрагмент: {chosen_item['label']}: {chosen_item['score']:.2f}")
+                
+                # Преобразуем PIL в байты
+                img = chosen_item["image"]
+                format = img.format or "PNG"
+                img_byte_arr = BytesIO()
+                img.save(img_byte_arr, format=format)
+                img_byte_arr.seek(0)
+                data = img_byte_arr.read()
+
+        top_n = st.slider("Top-N", 1, 50, 10)
+
+        if st.button("Искать предмет"):
+            file_tuple = None
+
+            if img is not None:
+                file_tuple = (chosen_item['label'], data, format or "application/octet-stream")
+            else:
+                st.warning("Загрузите фото для поиска.")
+
+            if file_tuple:
+                # Передаём top_n в запрос
+                res = post_file(f"/search/by-image?top_k={top_n}", file_tuple)
+                results = res.get("results", [])
+                if not results:
+                    st.info("Ничего не найдено.")
+                for r in results:
+                    cols = st.columns([1, 1, 4])
+                    with cols[0]:
+                        st.image(f".{r['url']}", width='stretch')
+                    with cols[1]:
+                        st.write(f"product_id: {r['product_id']}")
+                        st.write(f"image_id: {r['image_id']}")
+                        st.write(f"score: {r['score']:.4f}")
+                        st.write(f"title: {r['title']}")
+                        st.write(f"rating: {r['rating']:.1f}")
+                    with cols[2]:
+                        st.write(f"description: {r['description']}")
+
+# with tab3:
 #     q = st.text_input("Текстовый запрос")
 #     if q and st.button("Искать по тексту"):
 #         res = get_json("/search/by-text", q=q)

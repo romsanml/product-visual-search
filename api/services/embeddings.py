@@ -14,7 +14,7 @@ class ImageEmbedder:
         self.model = CLIPModel.from_pretrained(self.model_name)
         self.model.to(self.device)
         self.model.eval()
-        self.processor = CLIPProcessor.from_pretrained(self.model_name)
+        self.processor = CLIPProcessor.from_pretrained(self.model_name, use_fast=True)
         self.feature_extractor = self.model.get_image_features
         self.dim = 512 # Размер эмбеддинга для clip-vit-base-patch32
 

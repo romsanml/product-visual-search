@@ -10,8 +10,9 @@ class GroundingDINOSearcher:
 
         self.device = torch.device(device)
         self.model_id = "IDEA-Research/grounding-dino-base"
-        self.box_threshold = float(0.30)
-        self.text_threshold = float(0.25)
+        self.box_threshold = float(0.05)
+        self.text_threshold = float(0.05)
+        self.score_threshold = float(0.15)
         self.processor = GroundingDinoProcessor.from_pretrained(self.model_id)
         self.model = GroundingDinoForObjectDetection.from_pretrained(self.model_id)
         self.model.to(self.device)
@@ -45,14 +46,15 @@ class GroundingDINOSearcher:
 
         boxes = results["boxes"]  # (N, 4) xyxy в пикселях
         scores = results["scores"]  # (N,)
-        labels = results["labels"]  # список строк с фразами
+        labels = results["text_labels"]  # список строк с фразами
 
         out: List[Dict[str, Any]] = []
         for box, score, label in zip(boxes, scores, labels):
             x1, y1, x2, y2 = [float(v) for v in box.tolist()]
-            out.append({
-                "box": [int(round(x1)), int(round(y1)), int(round(x2)), int(round(y2))],
-                "score": float(score),
-                "label": str(label),
-            })
+            if score >= self.score_threshold:
+                out.append({
+                    "box": [int(round(x1)), int(round(y1)), int(round(x2)), int(round(y2))],
+                    "score": float(score),
+                    "label": str(label),
+                })
         return out

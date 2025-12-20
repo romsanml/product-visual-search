@@ -16,4 +16,15 @@ class Settings(BaseModel):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
+    DEFAULT_PROMPT_PHRASES: list[str] = [
+        "case",
+        "T-shirt",
+        "pants",
+        "chip",
+        "cable",
+        "dress",
+        "glasses",
+        "fitness bracelet"
+    ]
+
 settings = Settings()
