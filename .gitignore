@@ -1,4 +1,4 @@
-vs-venv/
+pvs-venv/
 __pycache__/
 req.txt
 data/

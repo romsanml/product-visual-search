@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 class Settings(BaseModel):
     api_host: str = "0.0.0.0"
-    api_port: int = 8000
+    api_port: int = 8008
     db_url: str = "sqlite:///data/app.db"
     storage_root: str = "data/images"
     faiss_index_path: str = "data/faiss.index"

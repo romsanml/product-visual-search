@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from api.db import SessionLocal
 from api.models.orm import ProductImage, Product
-from api.dependencies import get_embedder, get_vdb
+from api.dependencies import get_embedder, get_vdb, get_searcher
 from api.config import settings
 
 
@@ -37,12 +37,12 @@ def to_out(img: ProductImage, score: float, product: Optional[Product] = None) -
 
 @router.post("/by-image")
 def search_by_image(
-    file: UploadFile = File(...),
-    top_k: int = settings.top_k,
-    embedder=Depends(get_embedder),
-    vdb=Depends(get_vdb),
-    db: Session = Depends(get_db),
-):
+        file: UploadFile = File(...),
+        top_k: int = settings.top_k,
+        embedder=Depends(get_embedder),
+        vdb=Depends(get_vdb),
+        db: Session = Depends(get_db),
+    ):
     data = file.file.read()
     vec = embedder.embed_bytes(data)
     ids, scores = vdb.search(vec, top_k=top_k)
@@ -59,6 +59,23 @@ def search_by_image(
         to_out(img_by_id[i], s, product_by_id.get(img_by_id[i].product_id))
         for i, s in zip(ids, scores) if i in img_by_id
     ]
+    return {"results": results}
+
+
+def build_prompt(phrases: List[str]) -> str:
+    # Для GroundingDINO фразы лучше разделять точкой и пробелом
+    return " . ".join(phrases) + " ."
+
+
+@router.post("/by-photo")
+def search_by_photo(
+    photo: UploadFile = File(...),
+    searcher=Depends(get_searcher),
+):
+    DEFAULT_PROMPT_PHRASES = ["product", "item", "package", "bottle", "can", "box", "bag", "jar"]
+    data = photo.file.read()
+    prompt = build_prompt(DEFAULT_PROMPT_PHRASES)
+    results = searcher.detect(data=data, prompt=prompt) # список {box, score, label}
     return {"results": results}
 
 
