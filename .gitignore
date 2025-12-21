@@ -5,4 +5,5 @@ data/
 database/
 notebooks/
 ui/pages/images2search
+ui/pages/photos2search
 .gitignore

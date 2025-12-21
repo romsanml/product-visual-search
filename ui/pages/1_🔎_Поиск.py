@@ -103,6 +103,8 @@ with tab1:
                     st.write(f"description: {r['description']}")
 
 with tab2:
+    # Добавить пять примеров из папки photos2search
+
     # Загрузка своего изображения
     photo = st.file_uploader("Загрузите фото", type=["jpg", "jpeg", "png", "webp"])
 
@@ -166,6 +168,7 @@ with tab2:
                     
                     # Обрезаем изображение с учётом отступов
                     cropped = image.crop((new_x1, new_y1, new_x2, new_y2))
+                    # Добавить удаление фона
                     cropped_list.append({
                         "image": cropped,
                         "label": label,

@@ -1,10 +1,10 @@
 import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from .config import settings
-from .db import engine
-from .models.orm import Base
-from .routers import health, products, search
+from api.config import settings
+from api.db import engine
+from api.models.orm import Base
+from api.routers import health, products, search
 import uvicorn
 
 def create_app() -> FastAPI:
