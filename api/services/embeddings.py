@@ -41,3 +41,15 @@ class ImageEmbedder:
         feats = self.feature_extractor(pixel_values=inputs)
         feats = F.normalize(feats, p=2, dim=1)  # L2 нормализация
         return feats.cpu().numpy().astype("float32")[0]
+
+    @torch.no_grad()
+    def embed_text(self, text: str) -> np.ndarray:
+        inputs = self.processor(
+            text=[text],
+            return_tensors="pt",
+            padding=True,
+        )
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        text_feats = self.model.get_text_features(**inputs)
+        text_feats = F.normalize(text_feats, p=2, dim=1)  # L2 нормализация
+        return text_feats.cpu().numpy().astype("float32")[0]

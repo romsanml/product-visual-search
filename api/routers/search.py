@@ -79,22 +79,29 @@ def search_by_photo(
     return {"results": results}
 
 
-# @router.get("/by-text")
-# def search_by_text(q: str, limit: int = 20, db: Session = Depends(get_db)):
-#     # Простой текстовый поиск по title/description
-#     stmt = f"%{q}%"
-#     rows = db.execute(
-#         select(Product).where((Product.title.ilike(stmt)) | (Product.description.ilike(stmt))).limit(limit)
-#     ).scalars().all()
+@router.get("/by-text")
+def search_by_text(
+    q: str,
+    limit: int = 20,
+    embedder=Depends(get_embedder),
+    vdb=Depends(get_vdb),
+    db: Session = Depends(get_db),
+):
+    # Конвертируем текст в вектор с помощью CLIP
+    text_vec = embedder.embed_text(q)
+    # Ищем похожие векторы в FAISS
+    ids, scores = vdb.search(text_vec, top_k=limit)
+    if not ids:
+        return {"results": []}
 
-#     out = []
-#     for p in rows:
-#         url = f"/static/images/{p.images[0].rel_path}" if p.images else None
-#         out.append({
-#             "product_id": p.id,
-#             "title": p.title,
-#             "rating": p.rating,
-#             "description": p.description,
-#             "preview_url": url,
-#         })
-#     return {"results": out}
+    imgs = db.execute(select(ProductImage).where(ProductImage.image_id.in_(ids))).scalars().all()
+    img_by_id = {im.image_id: im for im in imgs}
+    # Получаем все уникальные product_id из найденных картинок
+    product_ids = list(im.product_id for im in imgs)
+    products = db.execute(select(Product).where(Product.product_id.in_(product_ids))).scalars().all()
+    product_by_id = {p.product_id: p for p in products}
+    results = [
+        to_out(img_by_id[i], s, product_by_id.get(img_by_id[i].product_id))
+        for i, s in zip(ids, scores) if i in img_by_id
+    ]
+    return {"results": results}

@@ -4,12 +4,12 @@ import random
 from pathlib import Path
 from io import BytesIO
 from PIL import Image
-from ui.api_client import post_file, post_photo
+from ui.api_client import post_file, post_photo, get_json
 
 st.set_page_config(layout="wide")
 st.title("🔎 Поиск")
 
-tab1, tab2 = st.tabs(["По изображению", "По фото"])
+tab1, tab2, tab3 = st.tabs(["По изображению", "По фото", "По тексту"])
 
 with tab1:
     # Инициализация session state для хранения примеров
@@ -249,15 +249,16 @@ with tab2:
                     with cols[2]:
                         st.write(f"description: {r['description']}")
 
-# with tab3:
-#     q = st.text_input("Текстовый запрос")
-#     if q and st.button("Искать по тексту"):
-#         res = get_json("/search/by-text", q=q)
-#         for r in res.get("results", []):
-#             cols = st.columns([1, 3])
-#             with cols[0]:
-#                 if r["preview_url"]:
-#                     st.image(f".{r['preview_url']}", width=150)
-#             with cols[1]:
-#                 st.write(f"{r['product_id']}: {r['title']}")
-#                 st.caption(r["description"])
+with tab3:
+    q = st.text_input("Текстовый запрос")
+    limit = st.slider("Лимит результатов", 1, 50, 10)
+    if q and st.button("Искать по тексту"):
+        res = get_json(f"/search/by-text?limit={limit}", q=q)
+        for r in res.get("results", []):
+            cols = st.columns([1, 3])
+            with cols[0]:
+                if r["url"]:
+                    st.image(f".{r['url']}", width=150)
+            with cols[1]:
+                st.write(f"{r['product_id']}: {r['title']}")
+                st.caption(r["description"])
