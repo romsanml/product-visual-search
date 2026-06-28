@@ -1,10 +1,13 @@
 import streamlit as st
 import mimetypes
 import random
+import tempfile
+from streamlit_mic_recorder import mic_recorder
 from pathlib import Path
 from io import BytesIO
 from PIL import Image
 from ui.api_client import post_file, post_photo, get_json
+from ui.modules.voice_input import load_asr, clear_text, append_text, get_asr_result
 
 st.set_page_config(layout="wide")
 st.title("🔎 Поиск")
@@ -103,8 +106,6 @@ with tab1:
                     st.write(f"description: {r['description']}")
 
 with tab2:
-    # Добавить пять примеров из папки photos2search
-
     # Загрузка своего изображения
     photo = st.file_uploader("Загрузите фото", type=["jpg", "jpeg", "png", "webp"])
 
@@ -168,7 +169,6 @@ with tab2:
                     
                     # Обрезаем изображение с учётом отступов
                     cropped = image.crop((new_x1, new_y1, new_x2, new_y2))
-                    # Добавить удаление фона
                     cropped_list.append({
                         "image": cropped,
                         "label": label,
@@ -195,8 +195,11 @@ with tab2:
                     st.image(item["image"], caption=f"{item['label']}: {item['score']:.2f}", width='stretch')
 
         # Выбор одного из примеров
-        cache_key = next(iter(st.session_state.cropped_images))
-        cropped_list = st.session_state.cropped_images[cache_key][:max_display]
+        if st.session_state.cropped_images:
+            cache_key = next(iter(st.session_state.cropped_images))
+            cropped_list = st.session_state.cropped_images[cache_key][:max_display]
+        else:
+            cropped_list = []
 
         if cropped_list:
             # Создаём список опций: "метка (score)"
@@ -225,7 +228,7 @@ with tab2:
         if st.button("Искать предмет"):
             file_tuple = None
 
-            if img is not None:
+            if 'data' in locals() and data:
                 file_tuple = (chosen_item['label'], data, format or "application/octet-stream")
             else:
                 st.warning("Загрузите фото для поиска.")
@@ -250,8 +253,50 @@ with tab2:
                         st.write(f"description: {r['description']}")
 
 with tab3:
-    q = st.text_input("Текстовый запрос")
+    if "text_input_3" not in st.session_state:
+        st.session_state.text_input_3 = ""
+    if "voice_input" not in st.session_state:
+        st.session_state.voice_input = ""
+    if "_last_asr_result" not in st.session_state:
+        st.session_state._last_asr_result = ""
+    if "_last_audio_sig" not in st.session_state:
+        st.session_state._last_audio_sig = None
+    if "_clear_audio_after" not in st.session_state:
+        st.session_state._clear_audio_after = False
+
+    col1, col2, col3 = st.columns([1, 8, 1], vertical_alignment="bottom")
+
+    with col1:
+        st.write("Голосовой ввод")
+        asr = load_asr()
+        audio = mic_recorder(
+            start_prompt="🎙️ Записать",
+            stop_prompt="⏹️ Остановить",
+            key="rec",
+            args=(),
+            kwargs={}
+        )
+
+        if isinstance(audio, dict) and "bytes" in audio:
+            audio_bytes = audio["bytes"]
+            audio_sig = len(audio_bytes)
+
+            if st.session_state._clear_audio_after:
+                st.session_state._clear_audio_after = False
+                st.session_state._last_audio_sig = audio_sig
+            elif audio_sig != st.session_state._last_audio_sig:
+                text = get_asr_result(asr, audio_bytes)
+                st.session_state._last_audio_sig = audio_sig
+                append_text(text)
+
+    with col2:
+        q = st.text_input("Текстовый ввод", key="text_input_3")
+
+    with col3:
+        st.button("Очистить", on_click=clear_text)
+
     limit = st.slider("Лимит результатов", 1, 50, 10)
+
     if q and st.button("Искать по тексту"):
         res = get_json(f"/search/by-text?limit={limit}", q=q)
         for r in res.get("results", []):
